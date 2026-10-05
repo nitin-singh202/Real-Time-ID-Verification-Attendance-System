@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+data/qr_codes/*.png
+!data/qr_codes/.gitkeep
+data/exports/*.xlsx
+!data/exports/.gitkeep
+data/*.db
+logs/*.log
+!logs/.gitkeep
+.pytest_cache/
+.vscode/
+.idea/

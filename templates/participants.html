@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Participants Directory - Real-Time ID Verification & Attendance System{% endblock %}
+{% block page_heading %}Participants Directory{% endblock %}
+{% block page_subheading %}Search, manage, view and print attendee credentials & QR codes{% endblock %}
+
+{% block content %}
+<div class="card-box">
+    <!-- Filter & Search Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 20px;">
+        <form method="GET" action="{{ url_for('participants.list_participants') }}" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <input type="text" name="search" placeholder="Search by name or reg no..." value="{{ search }}" style="width: 240px;">
+            <select name="event" onchange="this.form.submit()" style="min-width: 200px;">
+                <option value="">All Events</option>
+                {% for ev in events %}
+                    <option value="{{ ev.name }}" {% if selected_event == ev.name %}selected{% endif %}>{{ ev.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+            {% if search or selected_event %}
+                <a href="{{ url_for('participants.list_participants') }}" class="btn btn-outline btn-sm">Clear</a>
+            {% endif %}
+        </form>
+
+        <a href="{{ url_for('participants.register') }}" class="btn btn-primary btn-sm">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Participant
+        </a>
+    </div>
+
+    <!-- Participants Table -->
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Participant Name</th>
+                    <th>Registration No</th>
+                    <th>Event / Session</th>
+                    <th>Category</th>
+                    <th>Contact</th>
+                    <th>Registered At</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if participants %}
+                    {% for p in participants %}
+                        <tr>
+                            <td><strong>{{ p.name }}</strong></td>
+                            <td><code style="color: #60a5fa; font-weight: bold;">{{ p.registration_number }}</code></td>
+                            <td><span style="font-size: 12px; color: #cbd5e1;">{{ p.event_name }}</span></td>
+                            <td><span class="badge badge-neutral">{{ p.category }}</span></td>
+                            <td>
+                                <div style="font-size: 12px; color: #94a3b8;">
+                                    {% if p.email %}<div>{{ p.email }}</div>{% endif %}
+                                    {% if p.phone %}<div>{{ p.phone }}</div>{% endif %}
+                                    {% if not p.email and not p.phone %}-{% endif %}
+                                </div>
+                            </td>
+                            <td><span style="font-size: 11px; color: #94a3b8;">{{ p.created_at }}</span></td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px;">
+                                    <!-- QR Pass View Button -->
+                                    <button onclick="viewBadgeModal('{{ p.name }}', '{{ p.registration_number }}', '{{ p.event_name }}', '{{ p.category }}', '{{ url_for('serve_qr_code', filename=p.participant_uuid + '.png') }}', '{{ url_for('participants.download_qr', participant_id=p.id) }}')" class="btn btn-outline btn-sm btn-icon" title="View & Print Pass">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="7" height="7"></rect>
+                                            <rect x="14" y="3" width="7" height="7"></rect>
+                                            <rect x="14" y="14" width="7" height="7"></rect>
+                                            <rect x="3" y="14" width="7" height="7"></rect>
+                                        </svg>
+                                    </button>
+
+                                    <!-- Download QR File Directly -->
+                                    <a href="{{ url_for('participants.download_qr', participant_id=p.id) }}" class="btn btn-outline btn-sm btn-icon" title="Download QR PNG">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                    </a>
+
+                                    <!-- Edit Button -->
+                                    <button onclick="openEditModal({{ p.id }}, '{{ p.name }}', '{{ p.registration_number }}', '{{ p.event_name }}', '{{ p.email or '' }}', '{{ p.phone or '' }}', '{{ p.category }}')" class="btn btn-outline btn-sm btn-icon" title="Edit Participant">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                    </button>
+
+                                    <!-- Delete Button -->
+                                    <form method="POST" action="{{ url_for('participants.delete_participant', participant_id=p.id) }}" style="display:inline;" onsubmit="return confirm('Delete participant {{ p.name }}?');">
+                                        <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Delete">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                            No participants found. Click "Add Participant" to register attendees.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: View & Print QR Pass -->
+<div id="qrModal" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+        <div class="modal-header">
+            <h3 id="modalPassTitle">Participant Pass</h3>
+            <button class="modal-close" onclick="closeModal('qrModal')">✕</button>
+        </div>
+
+        <div class="id-pass-card" style="box-shadow: none; border-top: 4px solid #3b82f6;">
+            <h3 id="modalName">Participant Name</h3>
+            <div id="modalRegNo" class="reg-number">REG123</div>
+            <div>
+                <img id="modalQRImg" src="" alt="QR Code" style="max-width: 180px;">
+            </div>
+            <p id="modalEvent" style="font-size: 13px; font-weight: 600; color: #1e293b;"></p>
+            <p id="modalCategory" style="font-size: 12px; color: #64748b;"></p>
+            <div class="pass-footer">
+                Real-Time ID Verification Pass
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+            <a id="modalDownloadBtn" href="#" class="btn btn-primary btn-sm">Download PNG</a>
+            <button onclick="window.print()" class="btn btn-secondary btn-sm">Print Pass</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Participant -->
+<div id="editModal" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Participant Details</h3>
+            <button class="modal-close" onclick="closeModal('editModal')">✕</button>
+        </div>
+
+        <form id="editForm" method="POST" action="">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="edit_name">Full Name <span class="req-star">*</span></label>
+                    <input type="text" id="edit_name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_reg">Registration Number <span class="req-star">*</span></label>
+                    <input type="text" id="edit_reg" name="registration_number" required style="text-transform: uppercase;">
+                </div>
+                <div class="form-group">
+                    <label for="edit_event">Event / Session <span class="req-star">*</span></label>
+                    <select id="edit_event" name="event_name" required>
+                        {% for ev in events %}
+                            <option value="{{ ev.name }}">{{ ev.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit_email">Email</label>
+                    <input type="email" id="edit_email" name="email">
+                </div>
+                <div class="form-group">
+                    <label for="edit_phone">Phone</label>
+                    <input type="text" id="edit_phone" name="phone">
+                </div>
+                <div class="form-group full-width">
+                    <label for="edit_category">Category</label>
+                    <select id="edit_category" name="category">
+                        <option value="Student">Student</option>
+                        <option value="Participant">Participant / Delegate</option>
+                        <option value="Speaker">Guest Speaker</option>
+                        <option value="VIP">VIP / Organizer</option>
+                        <option value="Faculty">Faculty / Staff</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function viewBadgeModal(name, regNo, eventName, category, qrUrl, downloadUrl) {
+    document.getElementById('modalName').textContent = name;
+    document.getElementById('modalRegNo').textContent = regNo;
+    document.getElementById('modalEvent').textContent = eventName;
+    document.getElementById('modalCategory').textContent = category;
+    document.getElementById('modalQRImg').src = qrUrl;
+    document.getElementById('modalDownloadBtn').href = downloadUrl;
+    openModal('qrModal');
+}
+
+function openEditModal(id, name, regNo, eventName, email, phone, category) {
+    document.getElementById('editForm').action = `/participants/${id}/edit`;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_reg').value = regNo;
+    document.getElementById('edit_event').value = eventName;
+    document.getElementById('edit_email').value = email;
+    document.getElementById('edit_phone').value = phone;
+    document.getElementById('edit_category').value = category;
+    openModal('editModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Logs - Real-Time ID Verification & Attendance System{% endblock %}
+{% block page_heading %}Attendance Records{% endblock %}
+{% block page_subheading %}Historical and real-time gate entry/exit logs with full filter capabilities{% endblock %}
+
+{% block content %}
+<div class="card-box">
+    <!-- Filters Bar -->
+    <form method="GET" action="{{ url_for('attendance.list_attendance') }}" style="display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+        <div>
+            <label for="filter_event" style="font-size: 12px; display: block; margin-bottom: 4px;">Event:</label>
+            <select id="filter_event" name="event" style="min-width: 180px;">
+                <option value="">All Events</option>
+                {% for ev in events %}
+                    <option value="{{ ev.name }}" {% if selected_event == ev.name %}selected{% endif %}>{{ ev.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label for="filter_date" style="font-size: 12px; display: block; margin-bottom: 4px;">Date:</label>
+            <input type="date" id="filter_date" name="date" value="{{ selected_date }}">
+        </div>
+
+        <div>
+            <label for="filter_status" style="font-size: 12px; display: block; margin-bottom: 4px;">Status:</label>
+            <select id="filter_status" name="status">
+                <option value="">All Statuses</option>
+                <option value="Present" {% if selected_status == 'Present' %}selected{% endif %}>Present</option>
+                <option value="Absent" {% if selected_status == 'Absent' %}selected{% endif %}>Absent</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="filter_search" style="font-size: 12px; display: block; margin-bottom: 4px;">Search Participant:</label>
+            <input type="text" id="filter_search" name="search" placeholder="Name or Reg No..." value="{{ search }}" style="width: 200px;">
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+            {% if selected_event or selected_date or selected_status or search %}
+                <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-outline btn-sm">Reset</a>
+            {% endif %}
+        </div>
+
+        <div style="margin-left: auto; margin-top: 20px; display: flex; gap: 8px;">
+            <a href="{{ url_for('reports.export_excel', event=selected_event, date=selected_date, status=selected_status) }}" class="btn btn-success btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export Excel
+            </a>
+            <a href="{{ url_for('reports.export_csv', event=selected_event, date=selected_date, status=selected_status) }}" class="btn btn-outline btn-sm">
+                Export CSV
+            </a>
+        </div>
+    </form>
+
+    <!-- Attendance Table -->
+    <div class="table-responsive">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Participant Name</th>
+                    <th>Registration No</th>
+                    <th>Event / Session</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Entry Timestamp</th>
+                    <th>Exit Timestamp</th>
+                    <th>Verification Method</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if records %}
+                    {% for r in records %}
+                        <tr>
+                            <td><strong>{{ r.name }}</strong></td>
+                            <td><code style="color: #60a5fa; font-weight: bold;">{{ r.registration_number }}</code></td>
+                            <td><span style="font-size: 12px; color: #cbd5e1;">{{ r.event_name }}</span></td>
+                            <td><span class="badge badge-neutral">{{ r.category }}</span></td>
+                            <td>
+                                {% if r.status == 'Present' %}
+                                    <span class="badge badge-success">✓ Present</span>
+                                {% else %}
+                                    <span class="badge badge-warning">{{ r.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td><span style="font-size: 12px;">{{ r.entry_time }}</span></td>
+                            <td><span style="font-size: 12px; color: #94a3b8;">{{ r.exit_time or '-' }}</span></td>
+                            <td><span class="badge badge-info" style="font-size: 10px;">{{ r.verification_method }}</span></td>
+                            <td style="text-align: right;">
+                                <form method="POST" action="{{ url_for('attendance.delete_attendance', attendance_id=r.id) }}" style="display:inline;" onsubmit="return confirm('Remove attendance entry for {{ r.name }}?');">
+                                    <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Delete Log">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                            No attendance records match your filter criteria.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

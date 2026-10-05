@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Live Entrance Scanner - Real-Time ID Verification & Attendance System{% endblock %}
+{% block page_heading %}Live Gate Scanner{% endblock %}
+{% block page_subheading %}Continuous automated computer-vision QR detection, database lookup & attendance logging{% endblock %}
+
+{% block content %}
+<!-- Gate Configuration Bar -->
+<div class="card-box" style="padding: 16px 20px; margin-bottom: 24px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div>
+                <label for="targetEventSelect" style="margin-right: 8px; font-weight: 600;">Active Gate Event:</label>
+                <select id="targetEventSelect" style="min-width: 220px;">
+                    {% for ev in events %}
+                        <option value="{{ ev.name }}" {% if selected_event == ev.name %}selected{% endif %}>{{ ev.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Entry / Exit Mode Toggle -->
+            <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: var(--radius-sm);">
+                <label for="exitModeToggle" style="cursor: pointer; margin: 0; font-size: 13px;">Exit Scan Mode:</label>
+                <input type="checkbox" id="exitModeToggle" style="cursor: pointer; width: 16px; height: 16px;">
+            </div>
+
+            <!-- Camera Index Switcher -->
+            <div>
+                <label for="cameraIndexSelect" style="margin-right: 8px; font-size: 13px;">Camera Index:</label>
+                <select id="cameraIndexSelect" style="padding: 6px 10px; font-size: 13px;">
+                    <option value="0" {% if camera_index == 0 %}selected{% endif %}>Cam 0 (Default)</option>
+                    <option value="1" {% if camera_index == 1 %}selected{% endif %}>Cam 1 (USB / External)</option>
+                    <option value="2" {% if camera_index == 2 %}selected{% endif %}>Cam 2</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button onclick="openModal('uploadModal')" class="btn btn-outline btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                Scan Image / Badge File
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Main Scanner Layout -->
+<div class="scanner-grid">
+    <!-- Camera Stream Column -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="video-container">
+            <!-- Continuous MJPEG Video Feed from OpenCV -->
+            <img src="{{ url_for('scanner.video_feed') }}" alt="Live Camera Video Feed" class="video-feed" id="videoFeedStream">
+            <!-- Animated HUD Laser Scanning Line -->
+            <div class="scan-laser"></div>
+        </div>
+
+        <!-- Manual Barcode / Registration Number Input Bar -->
+        <div class="card-box" style="padding: 16px 20px;">
+            <form id="manualScanForm" style="display: flex; gap: 12px; align-items: center;">
+                <label for="manualRegInput" style="white-space: nowrap; font-size: 13px;">Manual Quick-Entry / Barcode Gun:</label>
+                <input type="text" id="manualRegInput" placeholder="Scan or type Reg No (e.g. 23BCE1234)..." style="flex-grow: 1; text-transform: uppercase;">
+                <button type="submit" class="btn btn-primary btn-sm">Verify</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live HUD & Verification Feedback Column -->
+    <div style="display: flex; flex-direction: column; gap: 20px;">
+        <!-- Dynamic HUD Card -->
+        <div id="hudStatusCard" class="hud-status-card">
+            <div class="hud-header">
+                <span id="hudBadge" class="badge badge-neutral hud-badge">● SCANNER READY</span>
+                <span style="font-size: 11px; color: var(--text-muted);">Real-Time Detector</span>
+            </div>
+
+            <p id="hudMessage" style="font-size: 14px; font-weight: 500; color: var(--text-secondary); line-height: 1.4;">
+                Position a registered QR pass within the camera frame.
+            </p>
+
+            <div id="hudParticipantProfile">
+                <div class="participant-profile-card" style="text-align: center; padding: 28px 16px; border: 1px dashed rgba(255,255,255,0.1);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: #64748b; margin-bottom: 8px;">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <p style="font-size: 13px; color: #94a3b8;">Awaiting entrance scan...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Session Feed Logs -->
+        <div class="card-box" style="padding: 18px 20px; flex-grow: 1;">
+            <div class="card-box-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                <h2>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    Live Session Feed
+                </h2>
+            </div>
+            <div class="table-responsive">
+                <table class="custom-table" style="font-size: 12px;">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Reg No</th>
+                            <th>Result</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="liveScanLogsBody">
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                Scans in this session will appear here in real time.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Upload QR File for Testing / Offline Scan -->
+<div id="uploadModal" class="modal-backdrop">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Scan QR Code from Image File</h3>
+            <button class="modal-close" onclick="closeModal('uploadModal')">✕</button>
+        </div>
+
+        <form id="uploadScanForm">
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">
+                Upload a participant badge image, screenshot, or photo from disk to decode and log attendance.
+            </p>
+            <div class="form-group">
+                <label for="qrFileInput">Choose Image File (PNG, JPG):</label>
+                <input type="file" id="qrFileInput" name="qr_image" accept="image/*" required>
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('uploadModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Process QR Image</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/scanner.js') }}"></script>
+{% endblock %}
